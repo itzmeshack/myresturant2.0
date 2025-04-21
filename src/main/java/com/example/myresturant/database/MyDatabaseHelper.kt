@@ -82,7 +82,6 @@ class MyDatabaseHelper(context: Context) :
         onCreate(db)
     }
 
-    // Insert a new staff member
     fun addStaff(name: String, role: String): Long {
         val db = writableDatabase
         val values = ContentValues().apply {
@@ -94,7 +93,6 @@ class MyDatabaseHelper(context: Context) :
         return result
     }
 
-    // Update staff details
     fun updateStaff(id: Int, name: String, role: String): Int {
         val db = writableDatabase
         val values = ContentValues().apply {
@@ -106,7 +104,6 @@ class MyDatabaseHelper(context: Context) :
         return result
     }
 
-    // Delete staff by ID
     fun deleteStaff(id: Int): Int {
         val db = writableDatabase
         val result = db.delete("staff", "id = ?", arrayOf(id.toString()))
@@ -114,7 +111,6 @@ class MyDatabaseHelper(context: Context) :
         return result
     }
 
-    // Query all staff members
     fun getAllStaff(): List<String> {
         val staffList = mutableListOf<String>()
         val db = readableDatabase
@@ -130,11 +126,108 @@ class MyDatabaseHelper(context: Context) :
         db.close()
         return staffList
     }
+
+
+    fun getAllStaffDetailed(): List<String> {
+        val staffList = mutableListOf<String>()
+        val db = readableDatabase
+        val cursor = db.query("staff", arrayOf("id", "name", "role"), null, null, null, null, null)
+
+        with(cursor) {
+            while (moveToNext()) {
+                val id = getInt(getColumnIndexOrThrow("id"))
+                val name = getString(getColumnIndexOrThrow("name"))
+                val role = getString(getColumnIndexOrThrow("role"))
+                staffList.add("$id - $name - $role")
+            }
+        }
+        cursor.close()
+        db.close()
+        return staffList
+    }
+
+
+    // ----------- Shift Management Methods -----------
+
+    fun assignShift(date: String, staffId: Int): Long {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("date", date)
+            put("staff_id", staffId)
+            put("status", "Pending")
+        }
+        val result = db.insert("shift", null, values)
+        db.close()
+        return result
+    }
+
+    fun updateShiftStatus(shiftId: Int, status: String): Int {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("status", status)
+        }
+        val result = db.update("shift", values, "id = ?", arrayOf(shiftId.toString()))
+
+        if (status == "Accepted") {
+            db.execSQL(
+                """
+                UPDATE staff
+                SET shifts_completed = shifts_completed + 1
+                WHERE id = (SELECT staff_id FROM shift WHERE id = ?)
+            """, arrayOf(shiftId)
+            )
+        }
+
+        db.close()
+        return result
+    }
+
+    fun getShiftsByDate(date: String): List<String> {
+        val shiftList = mutableListOf<String>()
+        val db = readableDatabase
+
+        val query = """
+            SELECT s.name, sh.status
+            FROM shift sh
+            JOIN staff s ON sh.staff_id = s.id
+            WHERE sh.date = ?
+        """
+
+        val cursor = db.rawQuery(query, arrayOf(date))
+
+        with(cursor) {
+            while (moveToNext()) {
+                val name = getString(0)
+                val status = getString(1)
+                shiftList.add("$name - $status")
+            }
+        }
+
+        cursor.close()
+        db.close()
+        return shiftList
+    }
+
+
+    fun getStaffShiftStats(): List<String> {
+        val list = mutableListOf<String>()
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT name, shifts_completed FROM staff", null
+        )
+
+        with(cursor) {
+            while (moveToNext()) {
+                val name = getString(0)
+                val completed = getInt(1)
+                list.add("$name - Shifts Completed: $completed")
+            }
+        }
+
+        cursor.close()
+        db.close()
+        return list
+    }
+
+
 }
-
-
-// Other functions for menu, orders, etc., can be added similarly...
-
-
-
-
